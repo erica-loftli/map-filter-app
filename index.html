@@ -1,92 +1,129 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Interactive Price & Room Filter</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      margin: 0;
-    }
-
-    .filter-box {
-      max-width: 600px;
-      margin-bottom: 20px;
-    }
-
-    .filter-box label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 5px;
-    }
-
-    .range-values {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-
-    .map-container {
-      width: 100%;
-      height: 500px;
-    }
-
-    .dropdown {
-      width: 100%;
-      padding: 8px;
-      margin-top: 10px;
-    }
-
-    .apply-btn {
-      margin-top: 10px;
-      padding: 10px 20px;
-      background-color: #e63946;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-    }
-
-    .apply-btn:hover {
-      background-color: #d62839;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recherche</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Replace with your actual Google Maps API key -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtBNTPQ_kMfBJEPurwzxJUvWXZOIQXlec&callback=initMap" async defer></script>
 </head>
-<body>
+<body class="bg-gray-100 h-screen overflow-hidden">
 
-<div class="filter-box">
-  <label for="priceRange">Prix par mois ($ CAD)</label>
-  <input type="range" id="priceRange" min="0" max="4650" value="3000" step="50">
-  <div class="range-values">
-    <span>0</span>
-    <span id="priceValue">3000</span>
-    <span>4650</span>
-  </div>
+<div class="flex h-full">
+  <!-- Sidebar -->
+  <aside class="w-80 bg-white shadow-md flex flex-col">
+    <div class="border-b">
+      <nav class="flex flex-col divide-y text-sm">
+        <button class="tab text-left flex items-center gap-2 px-4 py-3 font-medium text-gray-700 active-tab border-l-4 border-red-500 bg-gray-50" data-tab="prix">
+          <i data-lucide="dollar-sign" class="w-4 h-4"></i> Prix
+        </button>
+        <button class="tab text-left flex items-center gap-2 px-4 py-3 text-gray-600 hover:bg-gray-50" data-tab="type">
+          <i data-lucide="layout" class="w-4 h-4"></i> Type / Pièces
+        </button>
+        <button class="tab text-left flex items-center gap-2 px-4 py-3 text-gray-600 hover:bg-gray-50" data-tab="filtres">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Plus de filtres
+        </button>
+      </nav>
+    </div>
 
-  <label for="roomType">Type de logement</label>
-  <select id="roomType" class="dropdown">
-    <option value="any">Tous types</option>
-    <option value="Studio">Studio</option>
-    <option value="1BR">1 chambre</option>
-    <option value="2BR">2 chambres</option>
-  </select>
+    <div class="flex-1 overflow-y-auto p-4 text-sm">
+      <!-- Prix -->
+      <div id="prix" class="tab-content">
+        <label class="block mb-2 font-semibold text-gray-700">Prix</label>
+        <input type="number" id="minPrice" placeholder="Min" class="w-full mb-3 p-2 border rounded" />
+        <input type="number" id="maxPrice" placeholder="Max" class="w-full p-2 border rounded" />
+      </div>
 
-  <button class="apply-btn" onclick="applyFilters()">APPLIQUER →</button>
+      <!-- Type -->
+      <div id="type" class="tab-content hidden">
+        <label class="block mb-2 font-semibold text-gray-700">Type / Pièces</label>
+        <div class="space-y-2">
+          <label class="flex items-center"><input type="checkbox" class="type-filter mr-2" value="2.5" /> 2 1/2</label>
+          <label class="flex items-center"><input type="checkbox" class="type-filter mr-2" value="3.5" /> 3 1/2</label>
+          <label class="flex items-center"><input type="checkbox" class="type-filter mr-2" value="3.5+" /> 3 1/2 +</label>
+        </div>
+      </div>
+
+      <!-- Plus de filtres -->
+      <div id="filtres" class="tab-content hidden">
+        <label class="block mb-2 font-semibold text-gray-700">Disponibilité</label>
+        <select id="availability" class="w-full mb-4 p-2 border rounded">
+          <option value="">N'importe quand</option>
+          <option value="now">Maintenant</option>
+        </select>
+
+        <label class="block mb-2 font-semibold text-gray-700">Étage</label>
+        <label class="flex items-center"><input type="checkbox" class="floor-filter mr-2" value="rdc" /> Rez-de-chaussée</label>
+        <label class="flex items-center"><input type="checkbox" class="floor-filter mr-2" value="dernier" /> Dernier étage</label>
+      </div>
+
+      <button onclick="applyFilters()" class="mt-6 w-full bg-red-500 text-white py-2 rounded text-center hover:bg-red-600">Appliquer les filtres</button>
+    </div>
+  </aside>
+
+  <!-- Main Map Area -->
+  <main class="flex-1 relative">
+    <div class="absolute inset-0">
+      <div id="map" class="w-full h-full"></div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="absolute bottom-0 left-0 right-0 bg-white bg-opacity-90 max-h-60 overflow-y-auto p-4 shadow-t-lg backdrop-blur-sm">
+      <h2 class="text-sm font-semibold text-gray-800 mb-2">Résultats</h2>
+      <div id="listingResults" class="space-y-3 text-sm text-gray-700"></div>
+    </div>
+  </main>
 </div>
 
-<div class="map-container" id="map"></div>
-
-<!-- Google Maps JS API -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtBNTPQ_kMfBJEPurwzxJUvWXZOIQXlec"></script>
-
 <script>
+  lucide.createIcons();
+
+  // Tab toggle logic
+  const tabs = document.querySelectorAll('.tab');
+  const contents = document.querySelectorAll('.tab-content');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('border-red-500', 'bg-gray-50', 'text-gray-700', 'font-medium', 'active-tab'));
+      tab.classList.add('border-red-500', 'bg-gray-50', 'text-gray-700', 'font-medium', 'active-tab');
+      const target = tab.getAttribute('data-tab');
+      contents.forEach(c => c.classList.add('hidden'));
+      document.getElementById(target).classList.remove('hidden');
+    });
+  });
+
   const listings = [
-    { title: "Studio à Québec", price: 950, type: "Studio", lat: 46.8139, lng: -71.2082 },
-    { title: "1BR à Sainte-Foy", price: 1400, type: "1BR", lat: 46.7800, lng: -71.3000 },
-    { title: "2BR à Limoilou", price: 1800, type: "2BR", lat: 46.8500, lng: -71.2300 },
-    { title: "1BR à Lévis", price: 1200, type: "1BR", lat: 46.7400, lng: -71.1900 },
-    { title: "2BR de luxe", price: 4200, type: "2BR", lat: 46.8100, lng: -71.2500 }
+    {
+      id: 1,
+      price: 800,
+      type: "2.5",
+      floor: "rdc",
+      available: "now",
+      title: "2 1/2 lumineux - centre-ville",
+      lat: 46.8139,
+      lng: -71.2082,
+    },
+    {
+      id: 2,
+      price: 1100,
+      type: "3.5",
+      floor: "dernier",
+      available: "",
+      title: "3 1/2 moderne - Vieux-Port",
+      lat: 46.8156,
+      lng: -71.2048,
+    },
+    {
+      id: 3,
+      price: 950,
+      type: "3.5+",
+      floor: "",
+      available: "now",
+      title: "3 1/2 + balcon - Montcalm",
+      lat: 46.8110,
+      lng: -71.2210,
+    },
   ];
 
   let map;
@@ -95,45 +132,50 @@
   function initMap() {
     map = new google.maps.Map(document.getElementById("map"), {
       center: { lat: 46.8139, lng: -71.2082 },
-      zoom: 11
+      zoom: 13,
     });
-
-    applyFilters(); // initial load
+    applyFilters();
   }
 
   function clearMarkers() {
-    for (const m of markers) m.setMap(null);
+    markers.forEach(marker => marker.setMap(null));
     markers = [];
   }
 
-  function applyFilters() {
-    const maxPrice = document.getElementById("priceRange").value;
-    const roomType = document.getElementById("roomType").value;
-
-    document.getElementById("priceValue").textContent = maxPrice;
-
-    const filtered = listings.filter(l =>
-      l.price <= maxPrice && (roomType === "any" || l.type === roomType)
-    );
-
+  function addMarkers(filteredListings) {
     clearMarkers();
-
-    for (const listing of filtered) {
+    filteredListings.forEach(listing => {
       const marker = new google.maps.Marker({
         position: { lat: listing.lat, lng: listing.lng },
         map,
-        title: `${listing.title} - $${listing.price}`
+        title: listing.title,
       });
-
       markers.push(marker);
-    }
+    });
   }
 
-  document.getElementById("priceRange").addEventListener("input", e => {
-    document.getElementById("priceValue").textContent = e.target.value;
-  });
+  function applyFilters() {
+    const min = parseInt(document.getElementById("minPrice").value || "0");
+    const max = parseInt(document.getElementById("maxPrice").value || "99999");
+    const types = [...document.querySelectorAll('.type-filter:checked')].map(cb => cb.value);
+    const floors = [...document.querySelectorAll('.floor-filter:checked')].map(cb => cb.value);
+    const avail = document.getElementById("availability").value;
 
-  window.onload = initMap;
+    const results = listings.filter(l =>
+      l.price >= min &&
+      l.price <= max &&
+      (types.length === 0 || types.includes(l.type)) &&
+      (floors.length === 0 || floors.includes(l.floor)) &&
+      (avail === "" || l.available === avail)
+    );
+
+    const resultContainer = document.getElementById("listingResults");
+    resultContainer.innerHTML = results.length
+      ? results.map(l => `<div><strong>${l.title}</strong><br> ${l.price} $ - ${l.type}</div>`).join("")
+      : "<p>Aucun résultat trouvé.</p>";
+
+    addMarkers(results);
+  }
 </script>
 
 </body>
